@@ -1,0 +1,2 @@
+https://skillbank.co.uk/arduino/ESP32-display.htm
+https://github.com/espressif/esp-idf-provisioning-android#qr-code-scan

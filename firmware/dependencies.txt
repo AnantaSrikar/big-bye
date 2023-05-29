@@ -1,0 +1,3 @@
+https://github.com/Bodmer/TFT_eSPI
+https://github.com/yoprogramo/QRcodeDisplay
+https://github.com/yoprogramo/QRcode_eSPI
