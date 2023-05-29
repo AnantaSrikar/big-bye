@@ -16,6 +16,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <qrcode_espi.h>
+#include <HTTPClient.h>
 
 #define USERNAME "user"
 
@@ -150,20 +151,47 @@ void setup()
  */
 void loop()
 {
-	if(is_prov_needed && !is_qr_displayed)
+	if(is_prov_needed)
 	{
-		displayProvQRcode();
-		is_qr_displayed = true;
+		if(!is_qr_displayed)
+		{
+			displayProvQRcode();
+			is_qr_displayed = true;
+		}
+		return;
 	}
 	
-	else if(!is_prov_needed)
+	is_qr_displayed = false;
+
+	String screenText;
+	HTTPClient http;
+
+	http.begin("https://route.srikar.tech");
+	int httpCode = http.GET();
+
+	// HTTP code will be negative on error
+	if(httpCode > 0)
 	{
-		is_qr_displayed = false;
-		display.fillScreen(TFT_WHITE);
-		display.setTextSize(1);
-		display.setTextColor(TFT_BLACK, TFT_WHITE);
-		display.drawString("Text from internet here.", 5, 64, 1);
+		Serial.printf("[HTTP] GET - code: %d\n", httpCode);
+		
+		if(httpCode == HTTP_CODE_OK)
+		{
+			screenText = http.getString();
+			Serial.println(screenText);
+			
+			display.fillScreen(TFT_WHITE);
+			display.setTextSize(1);
+			display.setTextColor(TFT_BLACK, TFT_WHITE);
+			display.drawString(screenText, 5, 64, 1);
+		}
 	}
-	
+
+	else
+	{
+		Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
+	}
+
+	http.end();
+
 	delay(2000);
 }
