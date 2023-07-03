@@ -20,12 +20,22 @@
 
 #define USERNAME "user"
 
+#define BTN_LEFT	14
+#define BTN_RIGHT	13
+#define BTN_UP		27
+#define BTN_DOWN	12
+
 int reconnect_try = 0;
 bool is_prov_needed = false;
 bool is_qr_displayed = false;
 
+bool isBTNup = false;
+bool isBTNdown = false;
+bool isBTNleft = false;
+bool isBTNright = false;
+
 TFT_eSPI display = TFT_eSPI();
-QRcode_eSPI qrcode (&display);
+QRcode_eSPI qrcode(&display);
 
 /**
  * @brief Function that erases WiFi credentials
@@ -133,6 +143,12 @@ void SysProvEvent(arduino_event_t *sys_event)
  */
 void setup()
 {
+	// Setup BTN Inputs
+	pinMode(BTN_LEFT, INPUT_PULLUP);
+	pinMode(BTN_RIGHT, INPUT_PULLUP);
+	pinMode(BTN_UP, INPUT_PULLUP);
+	pinMode(BTN_DOWN, INPUT_PULLUP);
+
 	// Run UART at 115200 baud rate.
 	Serial.begin(115200);
 
@@ -160,38 +176,77 @@ void loop()
 		}
 		return;
 	}
+
+	isBTNup = digitalRead(BTN_UP);
+	isBTNdown = digitalRead(BTN_DOWN);
+	isBTNleft = digitalRead(BTN_LEFT);
+	isBTNright = digitalRead(BTN_RIGHT);
+
+  Serial.println(isBTNup);
+  Serial.println(isBTNdown);
+  Serial.println(isBTNleft);
+  Serial.println(isBTNright);
+  
 	
 	is_qr_displayed = false;
 
 	String screenText;
-	HTTPClient http;
+	// HTTPClient http;
 
-	http.begin("https://route.srikar.tech");
-	int httpCode = http.GET();
+	// http.begin("https://route.srikar.tech");
+	// int httpCode = http.GET();
 
-	// HTTP code will be negative on error
-	if(httpCode > 0)
-	{
-		Serial.printf("[HTTP] GET - code: %d\n", httpCode);
+	// // HTTP code will be negative on error
+	// if(httpCode > 0)
+	// {
+	// 	Serial.printf("[HTTP] GET - code: %d\n", httpCode);
 		
-		if(httpCode == HTTP_CODE_OK)
-		{
-			screenText = http.getString();
-			Serial.println(screenText);
+	// 	if(httpCode == HTTP_CODE_OK)
+	// 	{
+	// 		screenText = http.getString();
+	// 		Serial.println(screenText);
 			
-			display.fillScreen(TFT_WHITE);
-			display.setTextSize(1);
-			display.setTextColor(TFT_BLACK, TFT_WHITE);
-			display.drawString(screenText, 5, 64, 1);
-		}
-	}
+	// 		display.fillScreen(TFT_WHITE);
+	// 		display.setTextSize(1);
+	// 		display.setTextColor(TFT_BLACK, TFT_WHITE);
+	// 		display.drawString(screenText, 5, 64, 1);
+	// 	}
+	// }
 
+	// else
+	// {
+	// 	Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
+	// }
+
+	// http.end();
+
+	if(isBTNdown == LOW)
+	{
+		screenText = "Down pressed";
+	}
+	else if(isBTNleft == LOW)
+	{
+		screenText = "Left pressed";
+	}
+	else if(isBTNright == LOW)
+	{
+		screenText = "Right pressed";
+	}
+	else if(isBTNup == LOW)
+	{
+		screenText = "Up pressed";
+	}
 	else
 	{
-		Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
+		screenText = "Idle state";
 	}
+	
+	display.fillScreen(TFT_WHITE);
+	display.setTextSize(1);
+	display.setTextColor(TFT_BLACK, TFT_WHITE);
+	display.drawString(screenText, 5, 64, 1);
 
-	http.end();
+ 
 
-	delay(2000);
+	delay(100);
 }
