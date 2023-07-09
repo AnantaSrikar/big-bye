@@ -8,9 +8,8 @@
 	@copyright Copyright (c) 2023
 """
 
-from flask import Flask
-
-# TODO: Get list of valid users from JSON file
+from flask import Flask, jsonify
+from json import load
 
 app = Flask(__name__)
 
@@ -20,4 +19,13 @@ def root():
 
 @app.route("/user/<username>", methods=["GET"])
 def get_user_msgs(username):
-	return f"I have to send a JSON here for {username}!"
+	
+	# Open JSON db
+	with open("userDB.json", "r") as inFPtr:
+		all_user_data = load(inFPtr)
+
+	if username in all_user_data:
+		return jsonify(all_user_data[username])
+
+	else:
+		return "Not sure what you're looking for :(", 404
