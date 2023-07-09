@@ -1,7 +1,7 @@
 /**
  * @file firmware.ino
  * @author Ananta Srikar
- * @brief Firmware that run on the ESP32 (4MB) to manage WiFi and Display messages on the SD
+ * @brief Firmware that run on the ESP32 (4MB) to manage WiFi and Display messages on the ST7735 Display
  * @version 0.1
  * @date 2023-05-28
  * 
