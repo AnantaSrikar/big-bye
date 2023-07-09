@@ -19,6 +19,7 @@
 #include <HTTPClient.h>
 
 #define USERNAME "user"
+#define SERVER_ADDR "https://yourwebdomain.here.com"
 
 #define BTN_LEFT	14
 #define BTN_RIGHT	13
@@ -182,43 +183,44 @@ void loop()
 	isBTNleft = digitalRead(BTN_LEFT);
 	isBTNright = digitalRead(BTN_RIGHT);
 
-  Serial.println(isBTNup);
-  Serial.println(isBTNdown);
-  Serial.println(isBTNleft);
-  Serial.println(isBTNright);
+	Serial.println(isBTNup);
+	Serial.println(isBTNdown);
+	Serial.println(isBTNleft);
+	Serial.println(isBTNright);
   
 	
 	is_qr_displayed = false;
 
 	String screenText;
-	// HTTPClient http;
+	HTTPClient http;
 
-	// http.begin("https://route.srikar.tech");
-	// int httpCode = http.GET();
+	// TODO: User specific domain
+	http.begin(SERVER_ADDR);
+	int httpCode = http.GET();
 
-	// // HTTP code will be negative on error
-	// if(httpCode > 0)
-	// {
-	// 	Serial.printf("[HTTP] GET - code: %d\n", httpCode);
+	// HTTP code will be negative on error
+	if(httpCode > 0)
+	{
+		Serial.printf("[HTTP] GET - code: %d\n", httpCode);
 		
-	// 	if(httpCode == HTTP_CODE_OK)
-	// 	{
-	// 		screenText = http.getString();
-	// 		Serial.println(screenText);
+		if(httpCode == HTTP_CODE_OK)
+		{
+			screenText = http.getString();
+			Serial.println(screenText);
 			
-	// 		display.fillScreen(TFT_WHITE);
-	// 		display.setTextSize(1);
-	// 		display.setTextColor(TFT_BLACK, TFT_WHITE);
-	// 		display.drawString(screenText, 5, 64, 1);
-	// 	}
-	// }
+			display.fillScreen(TFT_WHITE);
+			display.setTextSize(1);
+			display.setTextColor(TFT_BLACK, TFT_WHITE);
+			display.drawString(screenText, 5, 64, 1);
+		}
+	}
 
-	// else
-	// {
-	// 	Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
-	// }
+	else
+	{
+		Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
+	}
 
-	// http.end();
+	http.end();
 
 	if(isBTNdown == LOW)
 	{
@@ -245,8 +247,6 @@ void loop()
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
 	display.drawString(screenText, 5, 64, 1);
-
- 
 
 	delay(100);
 }
