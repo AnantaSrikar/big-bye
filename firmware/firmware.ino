@@ -40,7 +40,7 @@ bool isBTNdown = false;
 bool isBTNleft = false;
 bool isBTNright = false;
 
-String user_server_addr;
+String user_server_addr = "";
 bool refetch_needed = true;
 int cur_msg_num = 1;
 int num_msgs = 0;
@@ -91,6 +91,7 @@ void displayProvQRcode()
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
 	display.drawString("Scan with ESP SoftAP Prov", 5, 5, 1);
+	display.drawString("WiFi connection required!", 5, 118, 1);
 }
 
 /**
@@ -103,7 +104,7 @@ void displayCenter(String screenText)
 	display.fillScreen(TFT_WHITE);
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
-	display.drawString(screenText, 5, 64, 1);
+	display.drawString(screenText, 5, 60, 1);
 }
 
 /**
@@ -188,10 +189,7 @@ String getHTTPS(String url)
 		// Return the result of the request if everything went well
 		if(httpCode == HTTP_CODE_OK)
 		{
-			String returnString = http.getString();
-			Serial.println(returnString);
-			
-			return returnString;
+			return http.getString();
 		}
 	}
 
@@ -205,19 +203,48 @@ String getHTTPS(String url)
 }
 
 
-int numMsgsForUser(String unique_url)
+int numMsgsForUser()
 {
-	String str_num_msgs = getHTTPS(unique_url);
-
+	String str_num_msgs = getHTTPS(user_server_addr);
 	return str_num_msgs.toInt();
 }
 
-void updateDisplay(String unique_url, int msg_num)
+void updateDisplayWithMsg()
 {
+	// Get the full message
+	String cur_msg_url = user_server_addr;
+	cur_msg_url += "/";
+	cur_msg_url += String(cur_msg_num);
+
+	// Get current Message JSON and parse it
+	JsonObject& parsed = JSONBuffer.parseObject(getHTTPS(cur_msg_url));
+
+	if(!parsed.success())
+	{
+		Serial.println("\n\nJSON parsing failed!\n\n");
+		delay(5000);
+	}
+
+	String heading = parsed["heading"];
+	String msg = parsed["msg"];
+
+	// Each character width is approximately 6 pixels with text size 1
+	int headingX = (display.width() - (heading.length() * 6)) / 2; 
+
+	Serial.print("display.width(): ");
+	Serial.println(display.width());
+
+	Serial.print("heading.length(): ");
+	Serial.println(heading.length());
+
+	Serial.println(heading);
+	
+	display.fillScreen(TFT_WHITE);
+	display.setTextSize(1);
+	display.setTextColor(TFT_BLACK, TFT_WHITE);
+	display.drawString(heading, headingX, 3, 1);
 
 }
-
-// int headingX = (tft.width() - (heading.length() * 6 * 2)) / 2; // Each character width is approximately 6 pixels with text size 2
 
 
 /**
@@ -249,11 +276,11 @@ void setup()
 	user_server_addr += USERNAME;
 
 	// Wait till we attempt to connect to WiFi
-	delay(500);
+	delay(2000);
 
 	if(!is_prov_needed)
 	{
-		num_msgs = numMsgsForUser(user_server_addr);
+		num_msgs = numMsgsForUser();
 		Serial.println(num_msgs);
 
 		// Something is wrong on DB or username is incorrect
@@ -275,9 +302,9 @@ void setup()
 void loop()
 {
 
-	Serial.println(refetch_needed);
-	Serial.println(cur_msg_num);
-	Serial.println();
+	// Serial.println(refetch_needed);
+	// Serial.println(cur_msg_num);
+	// Serial.println();
 
 	// Pre WiFi Provisioning checks
 	if(is_prov_needed)
@@ -307,8 +334,10 @@ void loop()
 	{
 		// Refetch and update display
 
-		// TODO: Display message heading, message and footer 
-		display.fillScreen(TFT_WHITE);
+		displayCenter("Fetching....");
+
+		// TODO: Display message heading, message and footer
+		updateDisplayWithMsg();
 
 		refetch_needed = false;
 	}
@@ -347,5 +376,5 @@ void loop()
 		// screenText = "Down pressed";
 	}
 
-	delay(1000);
+	delay(10);
 }
