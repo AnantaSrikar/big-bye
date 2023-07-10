@@ -2,7 +2,7 @@
  * @file firmware.ino
  * @author Ananta Srikar
  * @brief Firmware that run on the ESP32 (4MB) to manage WiFi and Display messages on the ST7735 Display
- * @version 0.1
+ * @version 0.2
  * @date 2023-05-28
  * 
  * @copyright Copyright (c) 2023
@@ -17,14 +17,19 @@
 #include <TFT_eSPI.h>
 #include <qrcode_espi.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>	// Make sure v5.13.4 is installed
 
-#define USERNAME "user"
-#define SERVER_ADDR "https://yourwebdomain.here.com"
+// #define USERNAME "user"
+// #define SERVER_ADDR "https://yourwebdomain.here.com"
+#define USERNAME "user-1"
+#define SERVER_ADDR "https://bigbye.projects.srikar.tech"
 
 #define BTN_LEFT	14
 #define BTN_RIGHT	13
 #define BTN_UP		27
 #define BTN_DOWN	12
+
+#define JSON_PARSE_CAP 2048
 
 int reconnect_try = 0;
 bool is_prov_needed = false;
@@ -35,8 +40,17 @@ bool isBTNdown = false;
 bool isBTNleft = false;
 bool isBTNright = false;
 
+String user_server_addr;
+bool refetch_needed = true;
+int cur_msg_num = 1;
+int num_msgs = 0;
+
+// Display setup
 TFT_eSPI display = TFT_eSPI();
 QRcode_eSPI qrcode(&display);
+
+// JSON parser setup
+StaticJsonBuffer<JSON_PARSE_CAP> JSONBuffer;
 
 /**
  * @brief Function that erases WiFi credentials
@@ -77,6 +91,19 @@ void displayProvQRcode()
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
 	display.drawString("Scan with ESP SoftAP Prov", 5, 5, 1);
+}
+
+/**
+ * @brief Displays text at the centre of the screen
+ * 
+ * @param screenText 
+ */
+void displayCenter(String screenText)
+{
+	display.fillScreen(TFT_WHITE);
+	display.setTextSize(1);
+	display.setTextColor(TFT_BLACK, TFT_WHITE);
+	display.drawString(screenText, 5, 64, 1);
 }
 
 /**
@@ -140,18 +167,72 @@ void SysProvEvent(arduino_event_t *sys_event)
 }
 
 /**
+ * @brief Funtion that runs a HTTPS get request on a specified URL
+ * 
+ * @param url URL to run the GET request on
+ * @return String output of the GET request
+ */
+String getHTTPS(String url)
+{
+	HTTPClient http;
+
+	// Run the HTTP get
+	http.begin(url);
+	int httpCode = http.GET();
+
+	// HTTP code will be negative on error
+	if(httpCode > 0)
+	{
+		Serial.printf("[HTTP] GET - code: %d\n", httpCode);
+		
+		// Return the result of the request if everything went well
+		if(httpCode == HTTP_CODE_OK)
+		{
+			String returnString = http.getString();
+			Serial.println(returnString);
+			
+			return returnString;
+		}
+	}
+
+	else
+	{
+		Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
+		return "ERROR";
+	}
+
+	http.end();
+}
+
+
+int numMsgsForUser(String unique_url)
+{
+	String str_num_msgs = getHTTPS(unique_url);
+
+	return str_num_msgs.toInt();
+}
+
+void updateDisplay(String unique_url, int msg_num)
+{
+
+}
+
+// int headingX = (tft.width() - (heading.length() * 6 * 2)) / 2; // Each character width is approximately 6 pixels with text size 2
+
+
+/**
  * @brief Setup the board before running it
  */
 void setup()
 {
+	// Run UART at 115200 baud rate.
+	Serial.begin(115200);
+
 	// Setup BTN Inputs
 	pinMode(BTN_LEFT, INPUT_PULLUP);
 	pinMode(BTN_RIGHT, INPUT_PULLUP);
 	pinMode(BTN_UP, INPUT_PULLUP);
 	pinMode(BTN_DOWN, INPUT_PULLUP);
-
-	// Run UART at 115200 baud rate.
-	Serial.begin(115200);
 
 	// WiFi 
 	WiFi.onEvent(SysProvEvent);
@@ -161,6 +242,31 @@ void setup()
 	display.init();
 	display.setRotation(3);
 	display.fillScreen(TFT_WHITE);
+
+	// User specific URL
+	user_server_addr = SERVER_ADDR;
+	user_server_addr += "/user/";
+	user_server_addr += USERNAME;
+
+	// Wait till we attempt to connect to WiFi
+	delay(500);
+
+	if(!is_prov_needed)
+	{
+		num_msgs = numMsgsForUser(user_server_addr);
+		Serial.println(num_msgs);
+
+		// Something is wrong on DB or username is incorrect
+		if(num_msgs == 0)
+		{
+			displayCenter("Something is configured incorrectly...");
+
+			// Put the ESP32 into a locked state with no further processing
+			is_prov_needed = true;
+			is_qr_displayed = true;
+			return;
+		}
+	}
 }
 
 /**
@@ -168,6 +274,12 @@ void setup()
  */
 void loop()
 {
+
+	Serial.println(refetch_needed);
+	Serial.println(cur_msg_num);
+	Serial.println();
+
+	// Pre WiFi Provisioning checks
 	if(is_prov_needed)
 	{
 		if(!is_qr_displayed)
@@ -175,78 +287,65 @@ void loop()
 			displayProvQRcode();
 			is_qr_displayed = true;
 		}
+
+		delay(10000);
 		return;
 	}
 
+	// Since provisioning is done
+	is_qr_displayed = false;
+
+	// Initializing input buttons
 	isBTNup = digitalRead(BTN_UP);
 	isBTNdown = digitalRead(BTN_DOWN);
 	isBTNleft = digitalRead(BTN_LEFT);
 	isBTNright = digitalRead(BTN_RIGHT);
 
-	Serial.println(isBTNup);
-	Serial.println(isBTNdown);
-	Serial.println(isBTNleft);
-	Serial.println(isBTNright);
-  
-	
-	is_qr_displayed = false;
 
-	String screenText;
-	HTTPClient http;
-
-	// TODO: User specific domain
-	http.begin(SERVER_ADDR);
-	int httpCode = http.GET();
-
-	// HTTP code will be negative on error
-	if(httpCode > 0)
+	// Refetch and update display only when needed!
+	if(refetch_needed)
 	{
-		Serial.printf("[HTTP] GET - code: %d\n", httpCode);
-		
-		if(httpCode == HTTP_CODE_OK)
+		// Refetch and update display
+
+		// TODO: Display message heading, message and footer 
+		display.fillScreen(TFT_WHITE);
+
+		refetch_needed = false;
+	}
+
+	// TODO: Combo buttons
+
+	// Single button presses
+
+	if(isBTNleft == LOW)
+	{
+		// TODO: Display you're viewing the first message
+		if(cur_msg_num > 1)
 		{
-			screenText = http.getString();
-			Serial.println(screenText);
-			
-			display.fillScreen(TFT_WHITE);
-			display.setTextSize(1);
-			display.setTextColor(TFT_BLACK, TFT_WHITE);
-			display.drawString(screenText, 5, 64, 1);
+			cur_msg_num--;
+			refetch_needed = true;
 		}
 	}
 
-	else
-	{
-		Serial.printf("[HTTP] GET - error: %s\n", http.errorToString(httpCode).c_str());
-	}
-
-	http.end();
-
-	if(isBTNdown == LOW)
-	{
-		screenText = "Down pressed";
-	}
-	else if(isBTNleft == LOW)
-	{
-		screenText = "Left pressed";
-	}
 	else if(isBTNright == LOW)
 	{
-		screenText = "Right pressed";
+		// TODO: Display you're viewing the last message
+		if(cur_msg_num < num_msgs)
+		{
+			cur_msg_num++;
+			refetch_needed = true;
+		}
 	}
+
 	else if(isBTNup == LOW)
 	{
-		screenText = "Up pressed";
+		// screenText = "Up pressed";
 	}
-	else
-	{
-		screenText = "Idle state";
-	}
-	
-	display.fillScreen(TFT_WHITE);
-	display.setTextSize(1);
-	display.setTextColor(TFT_BLACK, TFT_WHITE);
-	display.drawString(screenText, 5, 64, 1);
 
-	delay(100);
+	else if(isBTNdown == LOW)
+	{
+		// screenText = "Down pressed";
+	}
+
+	delay(1000);
 }

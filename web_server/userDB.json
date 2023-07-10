@@ -1,13 +1,29 @@
 {
 	"user-1":
 	{
-		"Message Heading 1": "Some long sample text, I don't like lorem ipsum, for user-1",
-		"Message Heading 2": "I hope this format of json really works out, for user-1"
+		"1":
+		{
+			"heading": "Message Heading 1",
+			"msg": "Some long sample text, I don't like lorem ipsum, for user-1"
+		},
+
+		"2":
+		{
+			"heading": "Message Heading 2",
+			"msg": "I hope this format of json really works out, for user-1"
+		},
+
+		"num_msgs": 2
 	},
 
 	"user-4":
 	{
-		"Message Heading 1": "Some long sample text, I don't like lorem ipsum, for user-4",
-		"Message Heading 2": "I hope this format of json really works out, for user-4"
+		"1":
+		{
+			"heading": "Message Heading 1",
+			"msg": "Some long sample text, I don't like lorem ipsum, for user-4"
+		},
+
+		"num_msgs": 1
 	}
 }
