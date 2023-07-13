@@ -1,2 +1,4 @@
-https://skillbank.co.uk/arduino/ESP32-display.htm
-https://github.com/espressif/esp-idf-provisioning-android#qr-code-scan
+https://skillbank.co.uk/arduino/ESP32-display.htm : Display setup with ESP32
+https://github.com/espressif/esp-idf-provisioning-android#qr-code-scan : For QR code generation
+https://github.com/Bodmer/TFT_eSPI/issues/558#issuecomment-593147012 : For Word wrap
+https://github.com/Bodmer/TFT_eSPI/issues/626 : For Word wrap

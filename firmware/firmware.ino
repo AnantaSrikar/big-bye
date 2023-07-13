@@ -50,6 +50,9 @@ int num_msgs = 0;
 TFT_eSPI display = TFT_eSPI();
 QRcode_eSPI qrcode(&display);
 
+// Finding the center Y coordinate. NOTE: Width and heigth parameters interchanged before switching to landscape
+int Y_CENTER = (display.width() / 2) - LTR_PXL;
+
 // JSON parser setup
 StaticJsonBuffer<JSON_PARSE_CAP> JSONBuffer;
 
@@ -100,7 +103,6 @@ void SysProvEvent(arduino_event_t *sys_event)
 				reconnect_try = 0;
 				eraseAllWiFiCredentials();
 			}
-
 			break;
 
 		case ARDUINO_EVENT_PROV_START:
@@ -114,23 +116,36 @@ void SysProvEvent(arduino_event_t *sys_event)
 			Serial.println((const char *) sys_event->event_info.prov_cred_recv.ssid);
 			Serial.print("\tPassword : ");
 			Serial.println((char const *) sys_event->event_info.prov_cred_recv.password);
+		
+			displayCenter("Received WiFi credentials!", Y_CENTER, true);
 			break;
 		
-		case ARDUINO_EVENT_PROV_CRED_FAIL: 
+		case ARDUINO_EVENT_PROV_CRED_FAIL:
 			Serial.println("\nProvisioning failed!\nPlease reset to factory and retry provisioning\n");
-			if(sys_event->event_info.prov_fail_reason == WIFI_PROV_STA_AUTH_ERROR) 
+			if(sys_event->event_info.prov_fail_reason == WIFI_PROV_STA_AUTH_ERROR)
+			{
 				Serial.println("\nWi-Fi AP password incorrect");
+				displayCenter("WiFi Password incorrect!", Y_CENTER, true);
+				delay(1000);
+			}
 			else
+			{
 				Serial.println("\nWi-Fi AP not found....Add API \" nvs_flash_erase() \" before beginProvision()");
+			}
+			eraseAllWiFiCredentials();
 			break;
 		
 		case ARDUINO_EVENT_PROV_CRED_SUCCESS:
 			Serial.println("\nProvisioning Successful");
+			displayCenter("Provisioning Complete!", Y_CENTER, true);
+			delay(1000);
 			break;
+		
 		case ARDUINO_EVENT_PROV_END:
 			Serial.println("\nProvisioning Ends");
 			is_prov_needed = false;
 			break;
+		
 		default:
 			break;
 	}
@@ -224,16 +239,46 @@ void displayProvQRcode()
 }
 
 /**
- * @brief Displays text at the center of the screen
+ * @brief Function that wraps words on the TFT disply
+ * 
+ * @param text The text you want to print on the screen
+ */
+void printWithWordWrap(String text)
+{
+	int wordStart = 0;
+	int wordEnd = 0;
+	while((text.indexOf(' ', wordStart) >= 0) && ( wordStart <= text.length()))
+	{
+		wordEnd = text.indexOf(' ', wordStart + 1);
+		uint16_t len = display.textWidth(text.substring(wordStart, wordEnd));
+		if(display.getCursorX() + len >= display.width())
+		{
+			display.println();
+			if (wordStart > 0)
+			{
+				wordStart++;
+			}
+		}
+		display.print(text.substring(wordStart, wordEnd));
+		wordStart = wordEnd;
+	}
+}
+
+/**
+ * @brief Displays text at the center of the screen, at given Y coordinate
  * 
  * @param screenText Text that needs to be displayed at the center
  */
-void displayCenter(String screenText)
+void displayCenter(String screenText, int y_coord, bool wipe_screen)
 {
-	display.fillScreen(TFT_WHITE);
+	if(wipe_screen)
+	{
+		display.fillScreen(TFT_WHITE);
+	}
+
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
-	display.drawString(screenText, getCenterXcoord(screenText), (display.height() - LTR_PXL) / 2, 1);
+	display.drawString(screenText, getCenterXcoord(screenText), y_coord, 1);
 }
 
 /**
@@ -266,10 +311,15 @@ void updateDisplayWithMsg()
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
 
 	// Display heading
-	display.drawString(heading, getCenterXcoord(heading), 5, 1);
+	displayCenter(heading, 5, true);
+	
+	// Display the message
+	display.setCursor(0, 20);
+	printWithWordWrap(msg);
 
-	display.setCursor(5, 15);
-	display.println(msg);
+	// Display msg number
+	String footer = String(cur_msg_num) + "/" + String(num_msgs);
+	displayCenter(footer, display.height() - LTR_PXL - 2, false);
 }
 
 /**
@@ -284,7 +334,7 @@ void setup()
 	display.init();
 	display.setRotation(3);
 	display.fillScreen(TFT_WHITE);
-	displayCenter("Initialising...");
+	displayCenter("Initialising...", Y_CENTER, true);
 
 	// Setup BTN Inputs
 	pinMode(BTN_LEFT, INPUT_PULLUP);
@@ -312,7 +362,7 @@ void setup()
 		// Something is wrong on DB or username is incorrect
 		if(num_msgs == 0)
 		{
-			displayCenter("Something is configured incorrectly...");
+			displayCenter("Something went terribly bad...", Y_CENTER, true);
 
 			// Put the ESP32 into a locked state with no further processing
 			is_prov_needed = true;
@@ -355,7 +405,7 @@ void loop()
 	{
 		// Refetch and update display
 
-		displayCenter("Fetching....");
+		displayCenter("Fetching....", Y_CENTER, true);
 
 		// TODO: Display message heading, message and footer
 		updateDisplayWithMsg();
@@ -369,31 +419,27 @@ void loop()
 
 	if(isBTNleft == LOW)
 	{
-		delay(100);
 		Serial.println("Left button press detected");
-
-		refetch_needed = true;
 
 		if(cur_msg_num > 1)
 		{
 			cur_msg_num--;
-			
 		}
 
 		// Display that you're viewing the first message if already on first message
 		else if(cur_msg_num == 1)
 		{
-			displayCenter("You're at the first message!");
-			delay(500);
+			displayCenter("You're at the first message!", Y_CENTER, true);
+			delay(1000);
 		}
+
+		refetch_needed = true;
+		delay(100);
 	}
 
 	else if(isBTNright == LOW)
 	{
-		delay(100);
 		Serial.println("Right button press detected");
-
-		refetch_needed = true;
 
 		if(cur_msg_num < num_msgs)
 		{
@@ -403,9 +449,12 @@ void loop()
 		// Display that you're viewing the last message if already on last message
 		else if (cur_msg_num == num_msgs)
 		{
-			displayCenter("You're at the last message!");
-			delay(500);
+			displayCenter("You're at the last message!", Y_CENTER, true);
+			delay(1000);
 		}
+
+		refetch_needed = true;
+		delay(100);
 	}
 
 	else if(isBTNup == LOW)
