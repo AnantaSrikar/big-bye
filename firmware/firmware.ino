@@ -19,10 +19,11 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>	// Make sure v5.13.4 is installed
 
-// #define USERNAME "user"
-// #define SERVER_ADDR "https://yourwebdomain.here.com"
-#define USERNAME "user-1"
-#define SERVER_ADDR "https://bigbye.projects.srikar.tech"
+#define USERNAME "user"
+#define SERVER_ADDR "https://yourwebdomain.here.com"
+
+// Each character width is approximately 6 pixels with text size 1
+#define LTR_PXL	6
 
 #define BTN_LEFT	14
 #define BTN_RIGHT	13
@@ -73,38 +74,6 @@ void eraseAllWiFiCredentials()
 	delay(1000);
 
 	ESP.restart();
-}
-
-/**
- * @brief Function to display the QR code when provisioning is needed
- * 
- */
-void displayProvQRcode()
-{
-	qrcode.init();
-
-	String qr_prov = "{\"ver\":\"v1\",\"name\":\"PROV_BIGBYE\",\"pop\":\"";
-	qr_prov += USERNAME;
-	qr_prov += "\",\"transport\":\"softap\"}";
-	qrcode.create(qr_prov);
-
-	display.setTextSize(1);
-	display.setTextColor(TFT_BLACK, TFT_WHITE);
-	display.drawString("Scan with ESP SoftAP Prov", 5, 5, 1);
-	display.drawString("WiFi connection required!", 5, 118, 1);
-}
-
-/**
- * @brief Displays text at the centre of the screen
- * 
- * @param screenText 
- */
-void displayCenter(String screenText)
-{
-	display.fillScreen(TFT_WHITE);
-	display.setTextSize(1);
-	display.setTextColor(TFT_BLACK, TFT_WHITE);
-	display.drawString(screenText, 5, 60, 1);
 }
 
 /**
@@ -175,6 +144,9 @@ void SysProvEvent(arduino_event_t *sys_event)
  */
 String getHTTPS(String url)
 {
+
+	Serial.println(url);
+
 	HTTPClient http;
 
 	// Run the HTTP get
@@ -202,13 +174,72 @@ String getHTTPS(String url)
 	http.end();
 }
 
-
+/**
+ * @brief Funtion to fetch the number of messages available for a user
+ * 
+ * @return int number of messages for a user
+ */
 int numMsgsForUser()
 {
 	String str_num_msgs = getHTTPS(user_server_addr);
 	return str_num_msgs.toInt();
 }
 
+/**
+ * @brief Get the X coord for the text to print at the center
+ * 
+ * @param text The text you want to display
+ * @return int the X coordinate to print text on the display
+ */
+int getCenterXcoord(String text)
+{
+	// Each character width is approximately 6 pixels with text size 1
+	int x_coord = (display.width() - (text.length() * LTR_PXL)) / 2;
+
+	if(x_coord < 0 || x_coord > display.width())
+	{
+		return 0;
+	}
+
+	return x_coord;
+}
+
+/**
+ * @brief Function to display the QR code when provisioning is needed
+ * 
+ */
+void displayProvQRcode()
+{
+	qrcode.init();
+
+	String qr_prov = "{\"ver\":\"v1\",\"name\":\"PROV_BIGBYE\",\"pop\":\"";
+	qr_prov += USERNAME;
+	qr_prov += "\",\"transport\":\"softap\"}";
+	qrcode.create(qr_prov);
+
+	display.setTextSize(1);
+	display.setTextColor(TFT_BLACK, TFT_WHITE);
+	display.drawString("Scan with ESP SoftAP Prov", 5, 5, 1);
+	display.drawString("WiFi connection required!", 5, 118, 1);
+}
+
+/**
+ * @brief Displays text at the center of the screen
+ * 
+ * @param screenText Text that needs to be displayed at the center
+ */
+void displayCenter(String screenText)
+{
+	display.fillScreen(TFT_WHITE);
+	display.setTextSize(1);
+	display.setTextColor(TFT_BLACK, TFT_WHITE);
+	display.drawString(screenText, getCenterXcoord(screenText), (display.height() - LTR_PXL) / 2, 1);
+}
+
+/**
+ * @brief Function that updates the display with the right message number
+ * 
+ */
 void updateDisplayWithMsg()
 {
 	// Get the full message
@@ -228,24 +259,18 @@ void updateDisplayWithMsg()
 	String heading = parsed["heading"];
 	String msg = parsed["msg"];
 
-	// Each character width is approximately 6 pixels with text size 1
-	int headingX = (display.width() - (heading.length() * 6)) / 2; 
-
-	Serial.print("display.width(): ");
-	Serial.println(display.width());
-
-	Serial.print("heading.length(): ");
-	Serial.println(heading.length());
-
 	Serial.println(heading);
 	
 	display.fillScreen(TFT_WHITE);
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
-	display.drawString(heading, headingX, 3, 1);
 
+	// Display heading
+	display.drawString(heading, getCenterXcoord(heading), 5, 1);
+
+	display.setCursor(5, 15);
+	display.println(msg);
 }
-
 
 /**
  * @brief Setup the board before running it
@@ -254,6 +279,12 @@ void setup()
 {
 	// Run UART at 115200 baud rate.
 	Serial.begin(115200);
+
+	// Diplay initialisation
+	display.init();
+	display.setRotation(3);
+	display.fillScreen(TFT_WHITE);
+	displayCenter("Initialising...");
 
 	// Setup BTN Inputs
 	pinMode(BTN_LEFT, INPUT_PULLUP);
@@ -264,11 +295,6 @@ void setup()
 	// WiFi 
 	WiFi.onEvent(SysProvEvent);
 	WiFiProv.beginProvision(WIFI_PROV_SCHEME_SOFTAP, WIFI_PROV_SCHEME_HANDLER_NONE, WIFI_PROV_SECURITY_1, USERNAME, "PROV_BIGBYE");
-
-	// Diplay initialisation
-	display.init();
-	display.setRotation(3);
-	display.fillScreen(TFT_WHITE);
 
 	// User specific URL
 	user_server_addr = SERVER_ADDR;
@@ -301,11 +327,6 @@ void setup()
  */
 void loop()
 {
-
-	// Serial.println(refetch_needed);
-	// Serial.println(cur_msg_num);
-	// Serial.println();
-
 	// Pre WiFi Provisioning checks
 	if(is_prov_needed)
 	{
@@ -348,21 +369,42 @@ void loop()
 
 	if(isBTNleft == LOW)
 	{
-		// TODO: Display you're viewing the first message
+		delay(100);
+		Serial.println("Left button press detected");
+
+		refetch_needed = true;
+
 		if(cur_msg_num > 1)
 		{
 			cur_msg_num--;
-			refetch_needed = true;
+			
+		}
+
+		// Display that you're viewing the first message if already on first message
+		else if(cur_msg_num == 1)
+		{
+			displayCenter("You're at the first message!");
+			delay(500);
 		}
 	}
 
 	else if(isBTNright == LOW)
 	{
-		// TODO: Display you're viewing the last message
+		delay(100);
+		Serial.println("Right button press detected");
+
+		refetch_needed = true;
+
 		if(cur_msg_num < num_msgs)
 		{
 			cur_msg_num++;
-			refetch_needed = true;
+		}
+
+		// Display that you're viewing the last message if already on last message
+		else if (cur_msg_num == num_msgs)
+		{
+			displayCenter("You're at the last message!");
+			delay(500);
 		}
 	}
 
@@ -376,5 +418,5 @@ void loop()
 		// screenText = "Down pressed";
 	}
 
-	delay(10);
+	delay(50);
 }

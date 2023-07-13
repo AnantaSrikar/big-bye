@@ -1,4 +1,4 @@
-https://github.com/Bodmer/TFT_eSPI			: 
-https://github.com/yoprogramo/QRcodeDisplay	:
-https://github.com/yoprogramo/QRcode_eSPI	:
-https://arduinojson.org/					: v5.13.4
+https://github.com/Bodmer/TFT_eSPI			: v2.5.0
+https://github.com/yoprogramo/QRcodeDisplay	: v2.1.0
+https://github.com/yoprogramo/QRcode_eSPI	: v2.0.0
+https://arduinojson.org/					: v5.13.5
