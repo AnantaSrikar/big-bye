@@ -2,25 +2,27 @@
  * @file firmware.ino
  * @author Ananta Srikar
  * @brief Firmware that run on the ESP32 (4MB) to manage WiFi and Display messages on the ST7735 Display
- * @version 0.2
+ * @version 0.3
  * @date 2023-05-28
  * 
  * @copyright Copyright (c) 2023
  * 
  */
 
-#include "WiFiProv.h"
-#include "WiFi.h"
-#include "esp_wifi.h"
-
+#include <WiFiProv.h>
+#include <WiFi.h>
+#include <esp_wifi.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <qrcode_espi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>	// Make sure v5.13.4 is installed
 
+// Modify as per your setup
 #define USERNAME "user"
 #define SERVER_ADDR "https://yourwebdomain.here.com"
+#define BASICAUTH_USERNAME	"changeUsernameLater"
+#define BASICAUTH_PASSWORD	"changePasswordLater"
 
 // Each character width is approximately 6 pixels with text size 1
 #define LTR_PXL	6
@@ -35,6 +37,7 @@
 int reconnect_try = 0;
 bool is_prov_needed = false;
 bool is_qr_displayed = false;
+bool has_IP_addr = false;
 
 bool isBTNup = false;
 bool isBTNdown = false;
@@ -91,6 +94,7 @@ void SysProvEvent(arduino_event_t *sys_event)
 		case ARDUINO_EVENT_WIFI_STA_GOT_IP:
 			Serial.print("\nConnected IP address : ");
 			Serial.println(IPAddress(sys_event->event_info.got_ip.ip_info.ip.addr));
+			has_IP_addr = true;
 			break;
 
 		case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
@@ -126,23 +130,24 @@ void SysProvEvent(arduino_event_t *sys_event)
 			{
 				Serial.println("\nWi-Fi AP password incorrect");
 				displayCenter("WiFi Password incorrect!", Y_CENTER, true);
-				delay(1000);
 			}
 			else
 			{
+				displayCenter("WiFi AP not found!", Y_CENTER, true);
 				Serial.println("\nWi-Fi AP not found....Add API \" nvs_flash_erase() \" before beginProvision()");
 			}
+			delay(1000);
 			eraseAllWiFiCredentials();
 			break;
 		
 		case ARDUINO_EVENT_PROV_CRED_SUCCESS:
 			Serial.println("\nProvisioning Successful");
-			displayCenter("Provisioning Complete!", Y_CENTER, true);
-			delay(1000);
 			break;
 		
 		case ARDUINO_EVENT_PROV_END:
 			Serial.println("\nProvisioning Ends");
+			displayCenter("Provisioning Complete!", Y_CENTER, true);
+			delay(1000);
 			is_prov_needed = false;
 			break;
 		
@@ -159,10 +164,10 @@ void SysProvEvent(arduino_event_t *sys_event)
  */
 String getHTTPS(String url)
 {
-
-	Serial.println(url);
-
 	HTTPClient http;
+	
+	// Set the Authorization header
+	http.setAuthorization(BASICAUTH_USERNAME, BASICAUTH_PASSWORD);
 
 	// Run the HTTP get
 	http.begin(url);
@@ -190,14 +195,27 @@ String getHTTPS(String url)
 }
 
 /**
- * @brief Funtion to fetch the number of messages available for a user
- * 
- * @return int number of messages for a user
+ * @brief Funtion to fetch and update the number of messages available for a user
  */
-int numMsgsForUser()
+void updateNumMsgsForUser()
 {
 	String str_num_msgs = getHTTPS(user_server_addr);
-	return str_num_msgs.toInt();
+	num_msgs = str_num_msgs.toInt();
+
+	Serial.println("In updateNumMsgsForUser");
+
+	// Something is wrong in DB, or username is incorrect, or BasicAuth creds failed
+	if(num_msgs == 0)
+	{
+		refetch_needed = false;
+		Serial.println("0 detected again, locking!");
+		displayCenter("Something is terribly bad...", Y_CENTER, true);
+
+		// Put the ESP32 into a locked state with no further processing
+		is_prov_needed = true;
+		is_qr_displayed = true;
+		return;
+	}
 }
 
 /**
@@ -356,19 +374,14 @@ void setup()
 
 	if(!is_prov_needed)
 	{
-		num_msgs = numMsgsForUser();
-		Serial.println(num_msgs);
-
-		// Something is wrong on DB or username is incorrect
-		if(num_msgs == 0)
+		// Wait till we get IP address. 
+		// Note to self: Spin locks are terrible btw, please use better sync methods in future
+		while(!has_IP_addr)
 		{
-			displayCenter("Something went terribly bad...", Y_CENTER, true);
-
-			// Put the ESP32 into a locked state with no further processing
-			is_prov_needed = true;
-			is_qr_displayed = true;
-			return;
+			delay(50);
 		}
+
+		updateNumMsgsForUser();
 	}
 }
 
@@ -393,27 +406,28 @@ void loop()
 	// Since provisioning is done
 	is_qr_displayed = false;
 
+	// Update number of messages for a user if we don't have it already
+	if(num_msgs == 0)
+	{
+		updateNumMsgsForUser();
+	}
+
 	// Initializing input buttons
 	isBTNup = digitalRead(BTN_UP);
 	isBTNdown = digitalRead(BTN_DOWN);
 	isBTNleft = digitalRead(BTN_LEFT);
 	isBTNright = digitalRead(BTN_RIGHT);
 
-
-	// Refetch and update display only when needed!
-	if(refetch_needed)
+	// Combo Buttons
+	if(isBTNdown == LOW && isBTNup == LOW)
 	{
-		// Refetch and update display
+		Serial.println("Combo button press!");
+		displayCenter("Factory reset board?", Y_CENTER, true);
+		displayCenter("Press down button to confirm", Y_CENTER + LTR_PXL * 2, false);
+		delay(1000);
 
-		displayCenter("Fetching....", Y_CENTER, true);
-
-		// TODO: Display message heading, message and footer
-		updateDisplayWithMsg();
-
-		refetch_needed = false;
+		refetch_needed = true;
 	}
-
-	// TODO: Combo buttons
 
 	// Single button presses
 
@@ -465,6 +479,18 @@ void loop()
 	else if(isBTNdown == LOW)
 	{
 		// screenText = "Down pressed";
+	}
+
+	// Refetch and update display only when needed!
+	if(refetch_needed)
+	{
+		// Refetch and update display
+
+		displayCenter("Fetching....", Y_CENTER, true);
+
+		updateDisplayWithMsg();
+
+		refetch_needed = false;
 	}
 
 	delay(50);
