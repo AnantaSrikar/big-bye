@@ -68,7 +68,7 @@ void eraseAllWiFiCredentials()
 	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 	esp_wifi_init(&cfg); //initiate and allocate wifi resources (does not matter if connection fails)
 	delay(2000); //wait a bit
-	if(esp_wifi_restore()!=ESP_OK)
+	if(esp_wifi_restore() != ESP_OK)
 	{
 		Serial.println("WiFi is not initialized by esp_wifi_init ");
 	}
@@ -165,7 +165,7 @@ void SysProvEvent(arduino_event_t *sys_event)
 String getHTTPS(String url)
 {
 	HTTPClient http;
-	
+
 	// Set the Authorization header
 	http.setAuthorization(BASICAUTH_USERNAME, BASICAUTH_PASSWORD);
 
@@ -202,14 +202,12 @@ void updateNumMsgsForUser()
 	String str_num_msgs = getHTTPS(user_server_addr);
 	num_msgs = str_num_msgs.toInt();
 
-	Serial.println("In updateNumMsgsForUser");
-
 	// Something is wrong in DB, or username is incorrect, or BasicAuth creds failed
-	if(num_msgs == 0)
+	if(num_msgs == 0 && !is_prov_needed)
 	{
 		refetch_needed = false;
 		Serial.println("0 detected again, locking!");
-		displayCenter("Something is terribly bad...", Y_CENTER, true);
+		displayCenter("Something is awfully wrong!", Y_CENTER, true);
 
 		// Put the ESP32 into a locked state with no further processing
 		is_prov_needed = true;
@@ -322,8 +320,6 @@ void updateDisplayWithMsg()
 	String heading = parsed["heading"];
 	String msg = parsed["msg"];
 
-	Serial.println(heading);
-	
 	display.fillScreen(TFT_WHITE);
 	display.setTextSize(1);
 	display.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -390,6 +386,47 @@ void setup()
  */
 void loop()
 {
+	// Read input buttons
+	isBTNup = digitalRead(BTN_UP);
+	isBTNdown = digitalRead(BTN_DOWN);
+	isBTNleft = digitalRead(BTN_LEFT);
+	isBTNright = digitalRead(BTN_RIGHT);
+
+	// Update number of messages for a user if we don't have it already
+	if(num_msgs == 0 && !is_prov_needed)
+	{
+		updateNumMsgsForUser();
+	}
+
+	// Combo Buttons (high priority, will come first)
+	if(isBTNdown == LOW && isBTNup == LOW)
+	{
+		Serial.println("Combo button press!");
+		displayCenter("Factory reset board?", Y_CENTER, true);
+		displayCenter("Press up button to confirm", Y_CENTER + LTR_PXL * 2, false);
+		displayCenter("Press down to to cancel", Y_CENTER + LTR_PXL * 4, false);
+		delay(2000);
+		while(true)
+		{
+			isBTNup = digitalRead(BTN_UP);
+			isBTNdown = digitalRead(BTN_DOWN);
+
+			if(isBTNdown == LOW)
+			{
+				displayCenter("Reset canceled. Refreshing...", Y_CENTER, true);
+				delay(1500);
+				refetch_needed = true;
+				break;
+			}
+
+			else if(isBTNup == LOW)
+			{
+				displayCenter("Resetting board now...", Y_CENTER, true);
+				eraseAllWiFiCredentials();
+			}
+		}
+	}
+
 	// Pre WiFi Provisioning checks
 	if(is_prov_needed)
 	{
@@ -399,37 +436,14 @@ void loop()
 			is_qr_displayed = true;
 		}
 
-		delay(10000);
+		delay(1000);
 		return;
 	}
 
 	// Since provisioning is done
 	is_qr_displayed = false;
 
-	// Update number of messages for a user if we don't have it already
-	if(num_msgs == 0)
-	{
-		updateNumMsgsForUser();
-	}
-
-	// Initializing input buttons
-	isBTNup = digitalRead(BTN_UP);
-	isBTNdown = digitalRead(BTN_DOWN);
-	isBTNleft = digitalRead(BTN_LEFT);
-	isBTNright = digitalRead(BTN_RIGHT);
-
-	// Combo Buttons
-	if(isBTNdown == LOW && isBTNup == LOW)
-	{
-		Serial.println("Combo button press!");
-		displayCenter("Factory reset board?", Y_CENTER, true);
-		displayCenter("Press down button to confirm", Y_CENTER + LTR_PXL * 2, false);
-		delay(1000);
-
-		refetch_needed = true;
-	}
-
-	// Single button presses
+	// Single button presses (low priority, to be used after message loads)
 
 	if(isBTNleft == LOW)
 	{
@@ -469,16 +483,6 @@ void loop()
 
 		refetch_needed = true;
 		delay(100);
-	}
-
-	else if(isBTNup == LOW)
-	{
-		// screenText = "Up pressed";
-	}
-
-	else if(isBTNdown == LOW)
-	{
-		// screenText = "Down pressed";
 	}
 
 	// Refetch and update display only when needed!
