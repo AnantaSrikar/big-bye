@@ -83,6 +83,19 @@ void eraseAllWiFiCredentials()
 }
 
 /**
+ * @brief Function to lock ESP and prevent accidnetal DOSing of server or itself
+ * 
+ */
+void lockESP()
+{
+	displayCenter("Something is awfully wrong!", Y_CENTER, true);
+
+	// Put the ESP32 into a locked state with no further processing
+	is_prov_needed = true;
+	is_qr_displayed = true;
+}
+
+/**
  * @brief Function that handles ESP32's WiFi
  * 
  * @param sys_event Arduino event that is linked to Wifi
@@ -178,11 +191,15 @@ String getHTTPS(String url)
 	{
 		Serial.printf("[HTTP] GET - code: %d\n", httpCode);
 		
-		// Return the result of the request if everything went well
-		if(httpCode == HTTP_CODE_OK)
+		// If asomething unexpected happens, lock up system
+		if(httpCode != HTTP_CODE_OK)
 		{
-			return http.getString();
+			lockESP();
+			return "ERROR";
 		}
+
+		// Return the result of the request if everything went well
+		return http.getString();
 	}
 
 	else
@@ -207,11 +224,8 @@ void updateNumMsgsForUser()
 	{
 		refetch_needed = false;
 		Serial.println("0 detected again, locking!");
-		displayCenter("Something is awfully wrong!", Y_CENTER, true);
-
-		// Put the ESP32 into a locked state with no further processing
-		is_prov_needed = true;
-		is_qr_displayed = true;
+		
+		lockESP();
 		return;
 	}
 }
@@ -376,7 +390,6 @@ void setup()
 		{
 			delay(50);
 		}
-
 		updateNumMsgsForUser();
 	}
 }
