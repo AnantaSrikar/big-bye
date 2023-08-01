@@ -23,6 +23,7 @@ def getJSONdata():
 
 	return all_user_data
 
+# Default route used to check if the API is online
 @app.route("/", methods=["GET"])
 def root():
 	return "Welcome to project BigBye!"

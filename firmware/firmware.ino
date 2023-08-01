@@ -21,8 +21,8 @@
 // Modify as per your setup
 #define USERNAME "user"
 #define SERVER_ADDR "https://yourwebdomain.here.com"
-#define BASICAUTH_USERNAME	"changeUsernameLater"
-#define BASICAUTH_PASSWORD	"changePasswordLater"
+#define BASICAUTH_USERNAME	"basicAuthUsername"
+#define BASICAUTH_PASSWORD	"basicAuthPassword"
 
 // Each character width is approximately 6 pixels with text size 1
 #define LTR_PXL	6
