@@ -1,0 +1,15 @@
+"Id";"Designator";"Footprint";"Quantity";"Designation";"Supplier and ref";
+1;"R2";"R_0805_2012Metric";1;"10k";;;
+2;"C7,C5,C1";"C_0805_2012Metric";3;"10uF";;;
+3;"C4,C3,C2,C6";"C_0805_2012Metric";4;"0.1uF";;;
+4;"P1";"USB_C_Receptacle_HRO_TYPE-C-31-M-12";1;"USB_C_Plug";;;
+5;"J2";"PinHeader_1x02_P2.54mm_Vertical";1;"BOOT_SEL";;;
+6;"SW3";"SW_TH_Tactile_Omron_B3F-10xx";1;"BTN_UP";;;
+7;"U2";"ESP32-WROOM-32";1;"ESP32-WROOM-32";;;
+8;"J1";"PinHeader_1x03_P2.54mm_Vertical";1;"UART";;;
+9;"J3";"PinSocket_1x16_P2.54mm_Vertical";1;"Display_Connector";;;
+10;"SW1";"SW_TH_Tactile_Omron_B3F-10xx";1;"BTN_LEFT";;;
+11;"SW4";"SW_TH_Tactile_Omron_B3F-10xx";1;"BTN_DOWN";;;
+12;"R1";"R_0805_2012Metric";1;"10K";;;
+13;"U1";"SOT-223-3_TabPin2";1;"AMS1117-3.3";;;
+14;"SW2";"SW_TH_Tactile_Omron_B3F-10xx";1;"BTN_RIGHT";;;
